@@ -20,4 +20,12 @@ class Resumen(Base):
     video_id = Column(Integer, ForeignKey("videos.id"))
     contenido = Column(Text)
 
+    # Nuevos campos
+    transcripcion_completa = Column(Text, nullable=True)
+    bullet_points = Column(Text, nullable=True)
+    clasificacion_discurso = Column(String, nullable=True)
+    temas_principales = Column(Text, nullable=True)
+    categoria_politica = Column(String, nullable=True)
+    sentimiento = Column(String, nullable=True)
+
     video = relationship("Video", back_populates="resumen")
