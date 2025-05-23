@@ -1,5 +1,5 @@
 [build]
-nixpacksPlan = true
+builder = "NIXPACKS"
 
-[env]
+[variables]
 PYTHON_VERSION = "3.10"
