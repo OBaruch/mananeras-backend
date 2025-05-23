@@ -26,3 +26,19 @@ def create_video(video: schemas.VideoCreate, db: Session = Depends(get_db)):
 @app.get("/api/videos", response_model=list[schemas.Video])
 def read_videos(db: Session = Depends(get_db)):
     return crud.get_videos(db)
+
+@app.post("/api/videos/{video_id}/resumen", response_model=schemas.Resumen)
+def create_resumen(video_id: int, resumen: schemas.ResumenCreate, db: Session = Depends(get_db)):
+    # Validamos que el video exista
+    db_video = db.query(models.Video).filter(models.Video.id == video_id).first()
+    if not db_video:
+        raise HTTPException(status_code=404, detail="Video no encontrado")
+    
+    return crud.create_resumen(db=db, video_id=video_id, resumen_data=resumen)
+
+@app.get("/api/videos/{video_id}/resumen", response_model=schemas.Resumen)
+def read_resumen(video_id: int, db: Session = Depends(get_db)):
+    resumen = crud.get_resumen_by_video(db, video_id)
+    if not resumen:
+        raise HTTPException(status_code=404, detail="Resumen no encontrado")
+    return resumen
