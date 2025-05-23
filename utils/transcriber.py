@@ -18,8 +18,12 @@ def download_audio(youtube_id: str) -> str:
         'quiet': True
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        raise RuntimeError(f"No se pudo descargar el audio de YouTube: {str(e)}")
+
 
     return filename
 
