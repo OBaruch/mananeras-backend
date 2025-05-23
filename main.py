@@ -2,6 +2,9 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 import models, crud, schemas
 from database import SessionLocal, engine, Base
+from utils.transcriber import download_audio, transcribe_audio
+from utils.transcriber import get_latest_video_id_from_channel
+
 
 app = FastAPI()
 
@@ -42,3 +45,52 @@ def read_resumen(video_id: int, db: Session = Depends(get_db)):
     if not resumen:
         raise HTTPException(status_code=404, detail="Resumen no encontrado")
     return resumen
+
+
+@app.post("/api/videos/{video_id}/auto-resumen", response_model=schemas.Resumen)
+def generate_resumen_automatically(video_id: int, db: Session = Depends(get_db)):
+    video = db.query(models.Video).filter(models.Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video no encontrado")
+
+    try:
+        # 1. Descarga el audio
+        audio_path = download_audio(video.youtube_id)
+        # 2. Transcribe el audio con Whisper
+        texto = transcribe_audio(audio_path)
+        # 3. Opcional: resumir con GPT aquí
+        resumen = texto[:3000]  # Por ahora usaremos transcripción directa como resumen
+        # 4. Guardar en la base de datos
+        nuevo = crud.create_resumen(db=db, video_id=video_id, resumen_data=schemas.ResumenCreate(contenido=resumen))
+        return nuevo
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar resumen: {str(e)}")
+    
+@app.post("/api/auto-resumen/latest", response_model=schemas.Resumen)
+def auto_resumen_del_ultimo_video(db: Session = Depends(get_db)):
+    try:
+        canal_url = "https://www.youtube.com/@ClaudiaSheinbaumP/videos"
+        youtube_id = get_latest_video_id_from_channel(canal_url)
+
+        # Revisa si el video ya existe
+        video = db.query(models.Video).filter(models.Video.youtube_id == youtube_id).first()
+        if not video:
+            # Si no existe, lo crea
+            from datetime import datetime
+            video = models.Video(
+                youtube_id=youtube_id,
+                title="Auto insertado por script",
+                date=datetime.utcnow()
+            )
+            db.add(video)
+            db.commit()
+            db.refresh(video)
+
+        # Ahora genera el resumen
+        audio_path = download_audio(video.youtube_id)
+        texto = transcribe_audio(audio_path)
+        resumen = texto[:3000]
+        nuevo = crud.create_resumen(db=db, video_id=video.id, resumen_data=schemas.ResumenCreate(contenido=resumen))
+        return nuevo
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en auto resumen: {str(e)}")
