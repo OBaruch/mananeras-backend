@@ -1,8 +1,11 @@
 from fastapi import FastAPI
-import os
+from database import Base, engine
 
 app = FastAPI()
 
+# Crear las tablas automáticamente al iniciar
+Base.metadata.create_all(bind=engine)
+
 @app.get("/")
 def home():
-    return {"message": "¡MVP Mañaneras está vivo!"}
+    return {"message": "¡MVP Mañaneras conectado a PostgreSQL!"}
