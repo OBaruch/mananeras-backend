@@ -4,14 +4,17 @@ import os
 import uuid
 from transformers import pipeline
 
+AUDIO_DIR = "/tmp/audio_files"
 
 def download_audio(youtube_id: str) -> str:
     url = f"https://www.youtube.com/watch?v={youtube_id}"
-    filename = f"audio_{uuid.uuid4().hex}.mp3"
+    os.makedirs(AUDIO_DIR, exist_ok=True)
+    audio_filename = f"audio_{uuid.uuid4().hex}.mp3"
+    absolute_audio_path = os.path.join(AUDIO_DIR, audio_filename)
     
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': filename,
+        'outtmpl': absolute_audio_path,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -22,11 +25,13 @@ def download_audio(youtube_id: str) -> str:
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+        if not os.path.exists(absolute_audio_path):
+            raise RuntimeError(f"Audio file not found after download: {absolute_audio_path}")
     except Exception as e:
         raise RuntimeError(f"No se pudo descargar el audio de YouTube: {str(e)}")
 
 
-    return filename
+    return absolute_audio_path
 
 def transcribe_audio(path: str, model_size="base") -> str:
     model = whisper.load_model(model_size)
