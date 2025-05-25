@@ -6,6 +6,28 @@ from transformers import pipeline
 
 AUDIO_DIR = "/tmp/audio_files"
 
+class YtdlLogger:
+    def __init__(self):
+        self.messages = []
+
+    def debug(self, msg):
+        # For yt-dlp, debug messages are often about the download process itself
+        if msg.startswith('[debug] '):
+            self.messages.append(msg)
+        elif msg.startswith('[info] '):
+            self.messages.append(msg)
+        elif 'ffmpeg' in msg.lower() or 'postprocessor' in msg.lower(): # Capture ffmpeg/postprocessor messages
+            self.messages.append(msg)
+        print(msg) # Also print to stdout for live logging if possible
+
+    def warning(self, msg):
+        self.messages.append(f"WARNING: {msg}")
+        print(f"WARNING: {msg}")
+
+    def error(self, msg):
+        self.messages.append(f"ERROR: {msg}")
+        print(f"ERROR: {msg}")
+
 def download_audio(youtube_id: str) -> str:
     url = f"https://www.youtube.com/watch?v={youtube_id}"
     os.makedirs(AUDIO_DIR, exist_ok=True)
@@ -19,16 +41,26 @@ def download_audio(youtube_id: str) -> str:
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
         }],
-        'quiet': True
+        'quiet': False # Changed to False to enable logging
     }
+
+    ytdl_logger = YtdlLogger()
+    ydl_opts['logger'] = ytdl_logger
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         if not os.path.exists(absolute_audio_path):
-            raise RuntimeError(f"Audio file not found after download: {absolute_audio_path}")
+            error_message = f"Audio file not found after download: {absolute_audio_path}"
+            if hasattr(ytdl_logger, 'messages') and ytdl_logger.messages:
+                error_message += "\nCollected yt-dlp logs:\n" + "\n".join(ytdl_logger.messages)
+            raise RuntimeError(error_message)
     except Exception as e:
-        raise RuntimeError(f"No se pudo descargar el audio de YouTube: {str(e)}")
+        # Include logs in this exception as well, in case the error happens during ydl.download()
+        error_message = f"No se pudo descargar el audio de YouTube: {str(e)}"
+        if hasattr(ytdl_logger, 'messages') and ytdl_logger.messages:
+            error_message += "\nCollected yt-dlp logs:\n" + "\n".join(ytdl_logger.messages)
+        raise RuntimeError(error_message)
 
 
     return absolute_audio_path
